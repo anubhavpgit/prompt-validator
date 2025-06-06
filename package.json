@@ -1,0 +1,19 @@
+{
+  "name": "prompt-validatior",
+  "version": "1.0.0",
+  "description": "Validation layer for prompts",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anubhavp.git/prompt-validator.git"
+  },
+  "author": "anubhavpgit",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/anubhavp.git/prompt-validator/issues"
+  },
+  "homepage": "https://github.com/anubhavp.git/prompt-validator#readme"
+}
