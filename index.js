@@ -1,19 +1,13 @@
 const { BedrockRuntimeClient, ApplyGuardrailCommand } = require('@aws-sdk/client-bedrock-runtime');
 
-// For Node.js 18+ fetch is built-in, for older versions you might need:
-// const fetch = require('node-fetch');
-
-// ARCHITECTURE: This service acts as a validation gateway/proxy
-// - If content is BLOCKED: Return error response immediately
-// - If content is ALLOWED: Forward request to main video service and return its response
-
-// Easy config - change these values as needed
+// Easy config - update these values
 const MODERATION_CONFIG = {
-  guardrailId: 'your-guardrail-id', // Replace with your actual guardrail ID
-  guardrailVersion: 'DRAFT', // or specific version number
+  // TODO: Replace with your actual guardrail ID once created
+  guardrailId: process.env.GUARDRAIL_ID || 'your-guardrail-id', 
+  guardrailVersion: process.env.GUARDRAIL_VERSION || 'DRAFT',
   
-  // Main video service endpoint
-  videoServiceUrl: 'https://your-video-service.com/generate', // Replace with actual endpoint
+  // For testing - will be replaced with actual video service URL
+  videoServiceUrl: process.env.VIDEO_SERVICE_URL || 'https://your-dummy-video-service.amazonaws.com/dev/generate',
   
   // Custom response messages
   messages: {
@@ -22,7 +16,7 @@ const MODERATION_CONFIG = {
   },
   
   // Enable/disable logging
-  enableLogging: true
+  enableLogging: process.env.ENABLE_LOGGING !== 'false'
 };
 
 // Initialize AWS Bedrock client
@@ -37,7 +31,7 @@ function createResponse(statusCode, body) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
       'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
     },
     body: JSON.stringify(body)
@@ -79,6 +73,7 @@ async function forwardToVideoService(originalEvent) {
     });
   }
 }
+
 function logRequest(prompt, result, reason = '') {
   if (!MODERATION_CONFIG.enableLogging) return;
   
@@ -93,6 +88,15 @@ function logRequest(prompt, result, reason = '') {
 // Main validation function
 async function validatePrompt(prompt) {
   try {
+    // If no guardrail is configured, allow everything for testing
+    if (MODERATION_CONFIG.guardrailId === 'your-guardrail-id') {
+      console.log('No guardrail configured - allowing all content for testing');
+      return {
+        allowed: true,
+        reason: 'No guardrail configured (testing mode)'
+      };
+    }
+
     const command = new ApplyGuardrailCommand({
       guardrailIdentifier: MODERATION_CONFIG.guardrailId,
       guardrailVersion: MODERATION_CONFIG.guardrailVersion,
@@ -130,7 +134,8 @@ async function validatePrompt(prompt) {
   } catch (error) {
     console.error('Guardrails API Error:', error);
     
-    // Fail closed - reject if we can't validate
+    // For testing,we want to allow content if guardrails fail
+    // In production, fail closed - reject if we can't validate
     return {
       allowed: false,
       reason: 'Validation service unavailable',
@@ -244,7 +249,8 @@ async function handleHealth() {
     timestamp: new Date().toISOString(),
     config: {
       guardrailId: MODERATION_CONFIG.guardrailId,
-      version: MODERATION_CONFIG.guardrailVersion
+      version: MODERATION_CONFIG.guardrailVersion,
+      videoServiceUrl: MODERATION_CONFIG.videoServiceUrl
     }
   });
 }
@@ -254,6 +260,7 @@ async function handleConfig() {
   return createResponse(200, {
     guardrailId: MODERATION_CONFIG.guardrailId,
     guardrailVersion: MODERATION_CONFIG.guardrailVersion,
+    videoServiceUrl: MODERATION_CONFIG.videoServiceUrl,
     loggingEnabled: MODERATION_CONFIG.enableLogging,
     messages: MODERATION_CONFIG.messages
   });
